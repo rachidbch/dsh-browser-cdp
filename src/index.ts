@@ -766,18 +766,9 @@ async function runEgoScript(subprocess: SubprocessService, script: string, exec:
       stderr,
     }
   }
-  const value = parseSentinel(stdout)
-  if (value === undefined) {
-    return {
-      ok: false,
-      error: `ego-browser finished but no ${SENTINEL} JSON payload was found on stdout${describeStderr(
-        stderr,
-      )}`,
-      stdout,
-      stderr,
-    }
-  }
-  return { ok: true, value, stdout, stderr }
+  // A script that prints ordinary output and no sentinel has still run; the
+  // sentinel only enriches the result. Exit code 0 is the authority on success.
+  return { ok: true, value: parseSentinel(stdout), stdout, stderr }
 }
 // ── tool plumbing ───────────────────────────────────────────────────────────
 /** JS snippet that pins an action tool to one task space. */
