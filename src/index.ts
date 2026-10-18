@@ -562,6 +562,14 @@ export async function runWithStaleSpaceRetry(  ctx: EgoContext,
     cfg.spaceTracker.resetToName()
     result = await withWarmupRetry(() => runEgoScript(ctx.subprocess, buildScript(), exec, cfg, graceOverrideMs))
   }
+  // A relaunched browser keeps the endpoint but mints a new browser id, so the
+  // cached ws dead-ends. Re-probe the same links once and retry before failing.
+  if (!result.ok && /failed to connect to CDP endpoint/i.test(result.error ?? '')) {
+    const refreshed = await cfg.refreshAttach?.()
+    if (refreshed === true) {
+      result = await withWarmupRetry(() => runEgoScript(ctx.subprocess, buildScript(), exec, cfg, graceOverrideMs))
+    }
+  }
   return result
 }
 /** Find the last line carrying the sentinel and JSON-parse its payload. */
@@ -605,6 +613,8 @@ export function findUpstreamPluginInstall(
 
 /** The live runtime config object built in apply() (getters read the settings bridge). */
 interface EgoRuntimeConfig {
+  /** Re-probe the active CDP link; true when it produced a new endpoint. */
+  refreshAttach?: () => Promise<boolean>
   egoBin: string
   configuredDefaultSpace: string | number
   spaceTracker: ActiveSpaceTracker
@@ -892,6 +902,8 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
       typeof config.egoBin === 'string' && config.egoBin !== ''
         ? config.egoBin
         : DEFAULT_EGO_BIN,
+    // Re-probe the active link on a dead cached ws (browser relaunched).
+    refreshAttach: () => triggerCdpRefresh(),
     configuredDefaultSpace: (config.defaultSpace as string | number | undefined) ?? DEFAULT_SPACE,
     spaceTracker,
     get defaultSpace() { return this.spaceTracker.current() },
@@ -1074,15 +1086,19 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
   // panel re-attaches to the same browser the tools now drive. No resolved
   // endpoint (local mode / nothing activated / unreachable) means "no remote
   // attach": the worker behaves exactly as before R1.
+  /** Last ws handed to the worker; a differ means the browser was relaunched. */
+  let lastAttachWs: string | null = null
   const triggerCdpRefresh = (() => {
     let inFlight = false
     let pending = false
-    const run = async (): Promise<void> => {
+    let changed = false
+    const run = async (): Promise<boolean> => {
       if (inFlight) {
         pending = true
-        return
+        return changed
       }
       inFlight = true
+      changed = false
       try {
         const resolved = resolveConfig(bridge.source() as RawConfig)
         const attach = await refreshAttach({
@@ -1111,7 +1127,15 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
           bundledCli: VENDORED_EGO_BIN,
         })
         const ws = attach.status === 'ready' && attach.wsUrl !== '' ? attach.wsUrl : null
+        // A browser restart keeps the same endpoint but mints a NEW browser id, so
+        // the cached ws goes stale while the endpoint stays valid. Re-probe the
+        // same links when the resolved ws differs from the cached one, even if
+        // the endpoint string did not change.
+        if (ws !== null && ws !== lastAttachWs) {
+          lastAttachWs = ws
+        }
         if (setAttachEndpoint(ws, attach.status === 'ready' ? attach.engine ?? 'unknown' : null)) {
+          changed = true
           void recycleWorker('cdp activation change').catch(() => null)
         }
       } catch {
@@ -1123,14 +1147,13 @@ export function apply(ctx: EgoContext, config: RawConfig = {}): void {
           void run()
         }
       }
+      return changed
     }
-    return () => {
-      void run()
-    }
+    return (): Promise<boolean> => run()
   })()
-  bridge.onChange(triggerCdpRefresh)
+  bridge.onChange(() => void triggerCdpRefresh())
   // Initial probe so the first bcdp_* call attaches without waiting for a change.
-  triggerCdpRefresh()
+  void triggerCdpRefresh()
   // Drop stale attach state when the plugin unmounts; a fresh mount starts clean.
   ctx.effect?.(() => () => {
     defaultAttachCache.reset()
