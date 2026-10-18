@@ -7,6 +7,7 @@
 export const EGO_HELP_INDEX: Record<string, string> = {
   overview:
     'CDP 浏览器代理：结构化浏览器工具。导航/交互/观察/表单/网络/等待/键鼠皆有专项工具，另提供 bcdp_help(本索引)、bcdp_doctor(体检)、bcdp_cli/bcdp_script(自由脚本逃生舱)。连接与激活见 topic=links。' +
+    'If a bcdp_* tool is missing from your list, read topic=injection first: tools are tiered and only core stays resident. ' +
     '分类见: tools / navigate / observe / input / keyboard-mouse / form / wait / network / login / script / doctor / lightpanda / injection。用 `topic` 查询，或直接给工具名。',
   tools:
     '工具清单: bcdp_status, bcdp_space_open, bcdp_space_close, bcdp_snapshot, bcdp_navigate, bcdp_click(+double), bcdp_fill, bcdp_js, bcdp_cdp, bcdp_screenshot(+selector), bcdp_page_info, bcdp_wait, bcdp_wait_for_selector, bcdp_wait_for_url, bcdp_wait_for_response, bcdp_key(+text/type), bcdp_hover, bcdp_read_element, bcdp_select, bcdp_drag, bcdp_scroll, bcdp_upload, bcdp_check, bcdp_dialog, bcdp_download, bcdp_http, bcdp_captcha, bcdp_auth_flush, bcdp_login_import, bcdp_help, bcdp_doctor, bcdp_cli, bcdp_script, bcdp_jev_status, bcdp_jev_frame, bcdp_jev_attempt, bcdp_jev_ask, bcdp_jev_run。',
@@ -31,7 +32,14 @@ export const EGO_HELP_INDEX: Record<string, string> = {
   script: 'bcdp_cli / bcdp_script: 原样运行任意内置运行时 heredoc 脚本(page/browser/taskSpaces/site/fetch/cdp预载)。bcdp_script额外返回 duration/timedOut。',
   doctor: 'bcdp_doctor: 体检环境（浏览器候选、vendored runtime、状态目录、CDP端口、任务空间、引擎与降级清单）；首行附工具注入面快照。',
   injection:
-    '工具分级注入（不是工具，是出现时机）：38 个 bcdp_* 分四级——core（status/doctor/help/space_open/navigate/snapshot，常驻不可封印）/ browse（基础操作）/ extended（拖拽上传下载对话框裸CDP脚本登录搬运）/ judge（bcdp_jev_*）。' +
+    'SEALED TOOLS — read this first when a bcdp_* tool you expect is missing from your tool list. ' +
+    'Only the core tier (status, doctor, help, space_open, navigate, snapshot) stays registered. ' +
+    'browse and extended tools are deregistered until browser activity re-opens them; a restart seals them again. ' +
+    'Missing from the list = sealed, not broken, and not a wrong name. ' +
+    'Fix: call bcdp_status or bcdp_doctor (both count as browser activity), then retry the tool. ' +
+    'A call made before that fails with "unknown tool" at the harness level, before this plugin sees it. ' +
+    'To keep all 38 resident instead, set toolInjection=always in the profile config. ' +
+    '—— 工具分级注入（不是工具，是出现时机）：38 个 bcdp_* 分四级——core（status/doctor/help/space_open/navigate/snapshot，常驻不可封印）/ browse（基础操作）/ extended（拖拽上传下载对话框裸CDP脚本登录搬运）/ judge（bcdp_jev_*）。' +
     '设置旋钮（全 volatile，一级一个开关）：toolInjection = lazy（默认，只常驻 core，首次 bcdp_* 调用后铺开）/ always（挂载即全量，历史行为）；toolBrowse / toolExtended / toolJudge 三把开关——开 = 开放注册，关 = 该级从工具列表移除（core 级不给开关，封了就没解锁入口）；judge 级即使开了仍需配 JEV/Laya Key。' +
     '封印 = 从工具列表里反注册，不是执行期报错；lazy 下闲置回收会把扩展面收回。' +
     '**若某个 bcdp_* 工具不在你的工具列表里**：它被分级封印了——先跑 bcdp_status 或 bcdp_doctor（两者也算浏览器活动，会把面铺开），或让用户在设置页「工具封印」里打开对应档位的开关；别猜测不存在的工具名。',
