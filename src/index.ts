@@ -1822,7 +1822,7 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
     t({
       name: 'bcdp_js',
       description:
-        'Evaluate a JavaScript expression in the current page and return its JSON-serializable value (e.g. "document.title", "document.querySelectorAll(\'a\').length").',
+        'Read or compute a value inside the current page by evaluating one JavaScript expression there; returns its JSON-serializable result. Read-only inspection (DOM text, computed styles, element counts). Not for running multi-step scripts: use bcdp_script. Not raw protocol work: use bcdp_cdp. Not HTTP calls: use bcdp_http (e.g. "document.title", "document.querySelectorAll(\'a\').length").',
       parameters: {
         expression: {
           type: 'string',
@@ -1842,7 +1842,7 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
     t({
       name: 'bcdp_cdp',
       description:
-        'Issue a raw CDP command on the page target, e.g. cdp("Page.handleJavaScriptDialog", { accept: true }).',
+        'Send one raw Chrome DevTools Protocol command straight to the page target (escape hatch for anything the structured tools do not expose, e.g. DOM.getBoxModel). Advanced; prefer a structured tool when one exists. Not page JS: use bcdp_js, e.g. cdp("Page.handleJavaScriptDialog", { accept: true }).',
       parameters: {
         method: {
           type: 'string',
@@ -2414,7 +2414,7 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
     t({
       name: 'bcdp_http',
       description:
-        "Make an HTTP request and return status + body. Default runs in the agent page's browser context (cross-origin allowed when the server's CORS permits); set `mode: server` to use Node-side fetch.server. Use to scrape an API, POST data, or hit a service. (Note: on the vendored ego-linux Windows runtime, fetch.server can hit a libuv crash, so prefer the default browser mode there.)",
+        "Fetch a URL and return status + body without touching page state. Browser context by default (subject to the page's CORS); `mode: server` uses Node-side fetch, which ignores CORS. Use to scrape an API, POST data, or hit a service, not to render a page (use bcdp_navigate). (Note: on the vendored ego-linux Windows runtime, fetch.server can hit a libuv crash, so prefer the default browser mode there.)",
       parameters: {
         url: { type: 'string', required: true, description: 'Absolute URL to request.' },
         method: { type: 'string', description: 'HTTP method, default GET.' },
@@ -2453,7 +2453,7 @@ function registerActionTools(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (tool:
       const def = defineTool({
         name: 'bcdp_cli',
         description:
-          'Escape hatch: run an arbitrary `ego-browser nodejs` heredoc script verbatim (facades page/browser/taskSpaces/site/fetch and the raw cdp() are preloaded). Use when the structured bcdp_* tools do not cover the task. Returns raw stdout plus the parsed console.log payload when present.',
+          'Run a multi-step browser automation script as an `ego-browser` heredoc in one shot, returning raw stdout (facades page/browser/taskSpaces/site/fetch and raw cdp() preloaded). Same power as bcdp_script but no structured result envelope; prefer bcdp_script unless you need the raw output or a plain escape hatch. Use when the structured bcdp_* tools do not cover the task. Returns raw stdout plus the parsed console.log payload when present.',
         parameters: {
           script: {
             type: 'string',
@@ -2554,7 +2554,7 @@ function registerHelpAndDoctor(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (too
     defineTool({
       name: 'bcdp_help',
       description:
-        'Query the built-in ego-browser tool guide. `topic` may be a category (overview/tools/navigate/observe/input/keyboard-mouse/form/wait/network/login/script/doctor) or a specific tool name (e.g. bcdp_click). Returns the matching usage notes. Call this when unsure which eyebrow tool to use.',
+        'Look up the browser tool guide: every bcdp_* tool, what it does, and which to pick. `topic` accepts a category (overview/tools/navigate/observe/input/keyboard-mouse/form/wait/network/login/script/doctor) or a tool name (e.g. bcdp_click). Call this when unsure which browser tool to use, or when a bcdp_* tool you expected is missing from your tool list: tools are tiered, and only the core tier stays resident, so a missing tool is sealed, not broken. Any browser activity re-opens the whole surface, so call bcdp_status or bcdp_doctor first, then retry.',
       parameters: {
         topic: {
           type: 'string',
@@ -2747,7 +2747,7 @@ function registerHelpAndDoctor(ctx: EgoContext, cfg: EgoRuntimeConfig, reg: (too
       const def = defineTool({
         name: 'bcdp_script',
         description:
-          'Run an arbitrary `ego-browser nodejs` heredoc script in ONE invocation (same runtime/API as bcdp_cli: page/…locator/browser/taskSpaces/site/fetch/cdp preloaded), and return structured {ok, stdout, stderr, result, durationMs, timedOut}. Use for a full multi-step browser task as a single script.',
+          'Run a multi-step browser automation script as a single `ego-browser` heredoc and get a structured result {ok, stdout, stderr, result, durationMs, timedOut}. The preferred scripting tool; same runtime and facades as bcdp_cli (page/…locator/browser/taskSpaces/site/fetch/cdp preloaded). For a single expression prefer bcdp_js: page/…locator/browser/taskSpaces/site/fetch/cdp preloaded), and return structured {ok, stdout, stderr, result, durationMs, timedOut}. Use for a full multi-step browser task as a single script.',
         parameters: {
           script: {
             type: 'string',
