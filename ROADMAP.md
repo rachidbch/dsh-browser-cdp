@@ -1,6 +1,6 @@
 # ROADMAP
 
-## Camoufox / MCP track
+## Camoufox / MCP track (the stealth path, human-owned)
 
 CDP is the wrong tool against bot-resistant sites: detection looks for the protocol itself, not only for headless tells. That is why a second, protocol-different path is planned.
 
